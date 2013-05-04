@@ -38,7 +38,10 @@ def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0,
         end_page = None
     photos = flickr.walk(text=text, per_page=per_page_limit, tags=tags, user_id=user_id, 
                 start_page=start_page, end_page=end_page, tag_mode=tag_mode,
-                sort=sort, extras='tags,owner_name')
+                sort=sort, 
+                #extras='tags,owner_name'
+                extras='owner_name'
+               )
     urls = []
     users = []
     ids = []
@@ -49,7 +52,9 @@ def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0,
         print(p.attrib['id'])
         ids.append(p.attrib['id'])
         users.append(p.attrib['owner'])
-        tgs.append(p.attrib['tags'])
+        #tgs.append(p.attrib['tags'])
         onames.append(p.attrib['ownername'])
-    return tb.tabarray(columns = [urls, users, ids, tgs, onames], names=['url', 'user_id', 'id', 'tags', 'owner_name'])
+    #return tb.tabarray(columns = [urls, users, ids, tgs, onames], names=['url', 'user_id', 'id', 'tags', 'owner_name'])
+    return tb.tabarray(columns = [urls, users, ids, onames], names=['url', 'user\
+_id', 'id','owner_name']) 
         
