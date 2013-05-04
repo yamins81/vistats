@@ -98,18 +98,20 @@ class FlickrTagUserDataset(object):
         return self._tag_images
     
     def _get_tag_images(self):
-        t1 = flickr_utils.get_photo_data(tags=self.tags,
+        T = []
+        if self.tags:
+            t1 = flickr_utils.get_photo_data(tags=self.tags,
                    user_id=None,
                    limit=self.image_limit,
-                   start=0)
-        Ts = []
+                   start=0, tag_mode='all', sort='relevance')
+            T.append(t1)
         for _t in self.text.split(','):
             t = flickr_utils.get_photo_data(text=_t,
                    user_id=None,
                    limit=self.image_limit,
-                   start=0)
-            Ts.append(t)
-        return tb.tab_rowstack([t1] + Ts)
+                   start=0, tag_mode='all', sort='relevance')
+            T.append(t)
+        return tb.tab_rowstack(T)
 
     @property
     def tag_users(self):
@@ -140,7 +142,7 @@ class FlickrTagUserDataset(object):
             d = flickr_utils.get_photo_data(tags=None,
                    user_id=u,
                    limit=self.user_limit,
-                   start=0)
+                   start=0, tag_mode='all', sort='relevance')
             Ds.append(d)
         return tb.tab_rowstack(Ds)
 
@@ -210,20 +212,19 @@ class FlickrTagUserDataset(object):
                     _f.write(fp.read())
         
 
-class FlickrTagUserDatasetChanelTest(FlickrTagUserDataset):
-    tags = 'chanel no 5, chanel bag, chanel logo, chanel tote, chanel bags, chanel makeup'
-    text = 'chanel flap bag, chanel tote, chanel shoes, chanel handbags, chanel jumbo bag'
+class FlickrTagUserDatasetChanel(FlickrTagUserDataset):
+    tags=''
+    text = 'chanel flap bag, chanel tote, chanel shoes, chanel handbags, chanel jumbo bag, chanel no 5, chanel bag, chanel logo, chanel tote, chanel bags'
+    num_users = 30
+    user_limit = 3000
+    image_limit = 3000
+    
+
+class FlickrTagUserDatasetChanelTest(FlickrTagUserDatasetChanel):
     num_users = 2
     user_limit = 200
     image_limit = 200
 
-
-class FlickrTagUserDatasetChanel(FlickrTagUserDataset):
-    tags = 'chanel no 5, chanel bag, chanel logo, chanel tote, chanel bags, chanel makeup'
-    text = 'chanel flap bag, chanel tote, chanel shoes, chanel handbags, chanel jumbo bag'
-    num_users = 30
-    user_limit = 3000
-    image_limit = 3000
 
 
 class FlickrImgDownloaderResizer(object):

@@ -27,7 +27,8 @@ def get_photos(limit=100, tags=None, text=None, user_id=None, start=0):
         os.system('wget %s -P %s' % (url, dirname))
 
         
-def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0):
+def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0, 
+                   sort='relevance', tag_mode='all'):
     flickr = flickrapi.FlickrAPI(API_KEY, SECRET)
     per_page_limit = 500
     start_page = start / per_page_limit
@@ -36,14 +37,19 @@ def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0):
     else:
         end_page = None
     photos = flickr.walk(text=text, per_page=per_page_limit, tags=tags, user_id=user_id, 
-                start_page=start_page, end_page=end_page)
+                start_page=start_page, end_page=end_page, tag_mode=tag_mode,
+                sort=sort, extras='tags,owner_name')
     urls = []
     users = []
     ids = []
+    tgs = []
+    onames = []
     for p in photos:
         urls.append('http://farm%s.staticflickr.com/%s/%s_%s.jpg' % (p.attrib['farm'], p.attrib['server'], p.attrib['id'], p.attrib['secret']))
         print(p.attrib['id'])
         ids.append(p.attrib['id'])
         users.append(p.attrib['owner'])
-    return tb.tabarray(columns = [urls, users, ids], names=['url', 'user_id', 'id'])
+        tgs.append(p.attrib['tags'])
+        onames.append(p.attrib['ownername'])
+    return tb.tabarray(columns = [urls, users, ids, tgs, onames], names=['url', 'user_id', 'id', 'tags', 'owner_name'])
         
