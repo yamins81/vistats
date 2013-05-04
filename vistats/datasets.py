@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import numpy as np
 import tabular as tb
-import flickr_utils
+
 import yamutils.fast as fast
 import urllib2
 import Image
@@ -11,6 +11,7 @@ import Image
 import skdata.larray as larray
 from skdata.data_home import get_data_home
 
+import vistats.flickr_utils as flickr_utils
 
 BRAND_QUERIES = OrderedDict([('chanel bag', {'label': 'chanel', 'text': 'chanel bag'}),
                              ('ford F150', {'label': 'ford', 'text': 'ford F150'}),
@@ -147,16 +148,30 @@ class FlickrTagUserDataset(object):
         pass
         
     def home(self, *suffix_paths):
-        return os.path.join(get_data_home(), self.name, *suffix_paths)
+        return os.path.join(get_data_home(), 'Flickr', self.name, *suffix_paths)
+    
+    @property
+    def metapath(self):
+        return self.home('metadata.tsv')
         
     def _get_meta(self):
-        tag_images = self.tag_images
-        tag_users_images = self.tag_users_images
-        m1 = tag_users_images.addcols([fast.isin(tag_users_images['id'], 
-                                            tag_images['id'])], names=['Tag'])
-        m2 = tag_images[np.invert(fast.isin(tag_images['id'], tag_users_images['id']))]
-        m2 = m2.addcols([[1]*len(m2)], names=['Tag'])
-        meta = tb.tab_rowstack([m1, m2])
+        metapath = self.metapath
+        metadir = os.path.dirname(metapath)
+        if not os.path.isdir(metadir):
+            os.makedirs(metadir)
+        if not os.path.isfile(metapath):
+            tag_images = self.tag_images
+            tag_users_images = self.tag_users_images
+            m1 = tag_users_images.addcols([fast.isin(tag_users_images['id'], 
+                                                tag_images['id'])], names=['Tag'])
+            m2 = tag_images[np.invert(fast.isin(tag_images['id'], tag_users_images['id']))]
+            m2 = m2.addcols([[1]*len(m2)], names=['Tag'])
+            meta = tb.tab_rowstack([m1, m2])            
+            resource_home = self.home('resources')
+            filenames = [self.home('resources', ('Tag_' if t else 'NoTag_') + u.split('/')[-1]) for t, u in zip(meta['Tag'], meta['url'])]
+            meta = meta.addcols([filenames], names=['filename'])
+            meta.saveSV(metapath, metadata=True)
+        meta = tb.tabarray(SVfile=metapath)
         return meta
         
     @property
@@ -171,48 +186,56 @@ class FlickrTagUserDataset(object):
         mode = preproc['mode']
         size = tuple(preproc['size'])
         normalize = preproc['normalize']
-        resource_home = self.home('resources')
-        return larray.lmap(FlickrImgDownloaderResizer(resource_home,
+
+        return larray.lmap(FlickrImgDownloaderResizer(
                                             shape=size,
                                             dtype=dtype,
                                             normalize=normalize,
                                             mode=mode),
-                                self.meta['url'])
+                                self.meta[['url', 'filename']])
      
-    def download_images(self, k1, k2):
-        for url in self.meta['url'][k1: k2]:
-            file_path = url.split('/')[-1]
-            resource_home = self.home('resources')
-            lpath = os.path.join(resource_home, file_path)
-            if not os.path.isdir(resource_home):
-                os.makedirs(resource_home)
+    def download_images(self, inds=None):
+        if inds is None:
+            inds = range(len(self.meta))
+        for rec in self.meta[inds]:        
+            lpath = rec['filename']
+            url = rec['url']
+            dirname = os.path.dirname(lpath)
+            if not os.path.isdir(dirname):
+                os.makedirs(dirname)
             if not os.path.isfile(lpath):
                 with open(lpath, 'w') as _f:
                     fp = urllib2.urlopen(url)
                     print(url, lpath)
                     _f.write(fp.read())
-         
+        
+
+class FlickrTagUserDatasetChanelTest(FlickrTagUserDataset):
+    tags = 'chanel no 5, chanel bag, chanel logo, chanel tote, chanel bags, chanel makeup'
+    text = 'chanel flap bag, chanel tote, chanel shoes, chanel handbags, chanel jumbo bag'
+    num_users = 2
+    user_limit = 200
+    image_limit = 200
+
 
 class FlickrTagUserDatasetChanel(FlickrTagUserDataset):
     tags = 'chanel no 5, chanel bag, chanel logo, chanel tote, chanel bags, chanel makeup'
     text = 'chanel flap bag, chanel tote, chanel shoes, chanel handbags, chanel jumbo bag'
-    num_users = 25
-    user_limit = 1000
-    image_limit = 3000
+    num_users = 30
+    user_limit = 2000
+    image_limit = 4000
 
 
 class FlickrImgDownloaderResizer(object):
     """
     """
     def __init__(self,
-                 download_dir,
                  shape=None,
                  ndim=None,
                  dtype='float32',
                  normalize=True,
                  mode='L'
                  ):
-        self.download_dir = download_dir
         shape = tuple(shape)
         self._shape = shape
         if ndim is None:
@@ -232,9 +255,9 @@ class FlickrImgDownloaderResizer(object):
             return self._dtype
         raise AttributeError(attr)
 
-    def __call__(self, url):
-        file_path = url.split('/')[-1]
-        lpath = os.path.join(self.download_dir, file_path)
+    def __call__(self, rec):
+        lpath = rec['filename']
+        url = rec['url']
         dirname = os.path.dirname(lpath)
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
