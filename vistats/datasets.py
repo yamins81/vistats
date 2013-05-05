@@ -139,10 +139,18 @@ class FlickrTagUserDataset(object):
         users = self.tag_users
         Ds = []
         for u in users:
-            d = flickr_utils.get_photo_data(tags=None,
+            d1 = flickr_utils.get_photo_data(tags=None, text=None,
                    user_id=u,
                    limit=self.user_limit,
                    start=0, tag_mode='all', sort='relevance')
+            d2 = flickr_utils.get_photo_data(tags=None, text=self.tag_in_text,
+                   user_id=u,
+                   limit=self.user_limit,
+                   start=0, tag_mode='all', sort='relevance')
+            d1 = d1[np.invert(fast.isin(d1['id'], d2['id']))]
+            d1 = d1.addcols([np.array([0]*len(d1)).astype(np.int)], names=['Tag'])
+            d2 = d2.addcols([np.array([1]*len(d2)).astype(np.int)], names=['Tag'])
+            d = tb.tab_rowstack([d1, d2])
             Ds.append(d)
         return tb.tab_rowstack(Ds)
 
@@ -163,15 +171,15 @@ class FlickrTagUserDataset(object):
             os.makedirs(metadir)
         if not os.path.isfile(metapath):
             tag_images = self.tag_images
-            tag_users_images = self.tag_users_images
-            m1 = tag_users_images.addcols([fast.isin(tag_users_images['id'], 
-                                                tag_images['id'])], names=['Tag'])
+            m1 = self.tag_users_images
+            m1['Tag'] = m1['Tag'] | fast.isin(m1['id'], tag_images['id'])                                            
             m2 = tag_images[np.invert(fast.isin(tag_images['id'], tag_users_images['id']))]
             m2 = m2.addcols([[1]*len(m2)], names=['Tag'])
             meta = tb.tab_rowstack([m1, m2])            
             resource_home = self.home('resources')
             filenames = [self.home('resources', ('Tag_' if t else 'NoTag_') + u.split('/')[-1]) for t, u in zip(meta['Tag'], meta['url'])]
             meta = meta.addcols([filenames], names=['filename'])
+            meta = meta.aggregate(On=['url'], AggFunc=lambda x: x[0])
             meta.saveSV(metapath, metadata=True)
         meta = tb.tabarray(SVfile=metapath)
         return meta
@@ -211,6 +219,10 @@ class FlickrTagUserDataset(object):
                     print(url, lpath)
                     _f.write(fp.read())
         
+        
+#########################
+##########Tests##########
+#########################
 
 class FlickrTagUserDatasetChanel(FlickrTagUserDataset):
     tags=''
@@ -226,6 +238,40 @@ class FlickrTagUserDatasetChanelTest(FlickrTagUserDatasetChanel):
     image_limit = 200
 
 
+class FlickrTagUserDatasetMcDonaldsTest(FlickrTagUserDataset):
+    tags=''
+    text = "McDonald's burger,mcdonald's milkshake,mcdonald's arches,big mac burger"
+    num_users = 2
+    user_limit = 200
+    image_limit = 200
+
+
+class FlickrTagUserDatasetCocaColaTest(FlickrTagUserDataset):
+    tags=''
+    text = "coke can,coke bottle,classic coca cola drink,coke zero can,cherry coke can"
+    num_users = 2
+    user_limit = 200
+    image_limit = 200
+
+
+
+##########################
+##########Chanel##########
+##########################
+
+class FlickrTagUserDatasetChanelBagsTest(FlickrTagUserDataset):
+    tags=''
+    text = 'chanel flap bag,chanel tote, chanel handbags,chanel jumbo bag,chanel bag,chanel purse,chanel clutch,chanel coco coon bag,chanel mademoiselle bag,chanel lipstick bags,chanel key case'
+    num_users = 10
+    user_limit = 200
+    image_limit = 200
+    tag_in_text='chanel'
+    
+    
+    
+#########################
+##########Utils##########
+#########################
 
 class FlickrImgDownloaderResizer(object):
     """

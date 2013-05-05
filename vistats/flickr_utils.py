@@ -28,7 +28,7 @@ def get_photos(limit=100, tags=None, text=None, user_id=None, start=0):
 
         
 def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0, 
-                   sort='relevance', tag_mode='all'):
+                   sort='relevance', tag_mode='all', get_other_tags=False):
     flickr = flickrapi.FlickrAPI(API_KEY, SECRET)
     per_page_limit = 500
     start_page = start / per_page_limit
@@ -52,9 +52,11 @@ def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0,
         print(p.attrib['id'])
         ids.append(p.attrib['id'])
         users.append(p.attrib['owner'])
-        #tgs.append(p.attrib['tags'])
+        if get_other_tags:
+            gs.append(p.attrib['tags'])
         onames.append(p.attrib['ownername'])
-    #return tb.tabarray(columns = [urls, users, ids, tgs, onames], names=['url', 'user_id', 'id', 'tags', 'owner_name'])
-    return tb.tabarray(columns = [urls, users, ids, onames], names=['url', 'user\
-_id', 'id','owner_name']) 
+    if get_other_tags:
+        return tb.tabarray(columns = [urls, users, ids, tgs, onames], names=['url', 'user_id', 'id', 'tags', 'owner_name'])
+    else:
+        return tb.tabarray(columns = [urls, users, ids, onames], names=['url', 'user_id', 'id','owner_name']) 
         
