@@ -1,5 +1,6 @@
-import flickrapi
 import os
+import time
+import flickrapi
 import tabular as tb
 
 #app name:	Training Stimuli
@@ -27,8 +28,23 @@ def get_photos(limit=100, tags=None, text=None, user_id=None, start=0):
         os.system('wget %s -P %s' % (url, dirname))
 
         
-def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0, 
-                   sort='relevance', tag_mode='all', get_other_tags=False):
+def get_photo_data(**kwargs):
+    attempts = 10
+    wait_time = 60
+    a = 0
+    while a < attempts:
+        try:
+            data = get_photo_data_core(**kwargs)
+        except flickrapi.FlickrError:
+            time.sleep(wait_time)
+            a += 1
+        else:
+            break
+    return data
+    
+    
+def get_photo_data_core(limit=500, tags=None, text=None, user_id=None, start=0, 
+                   sort='relevance', tag_mode='all', get_other_tags=False, photoset_id=None, owner=None):
     flickr = flickrapi.FlickrAPI(API_KEY, SECRET)
     per_page_limit = 500
     start_page = start / per_page_limit
@@ -36,12 +52,18 @@ def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0,
         end_page = (start + limit) / per_page_limit
     else:
         end_page = None
-    photos = flickr.walk(text=text, per_page=per_page_limit, tags=tags, user_id=user_id, 
-                start_page=start_page, end_page=end_page, tag_mode=tag_mode,
-                sort=sort, 
-                #extras='tags,owner_name'
-                extras='owner_name'
-               )
+    if get_other_tags:
+        extras = 'tags,owner_name'
+    else:
+        extras = 'owner_name'
+    if photoset_id is None:
+        photos = flickr.walk(text=text, per_page=per_page_limit, tags=tags, user_id=user_id, 
+                    start_page=start_page, end_page=end_page, tag_mode=tag_mode,
+                    sort=sort, 
+                    extras=extras
+                   )
+    else:
+        photos = flickr.walk_set(photoset_id, per_page=per_page_limit, extras=extras)
     urls = []
     users = []
     ids = []
@@ -51,9 +73,12 @@ def get_photo_data(limit=100, tags=None, text=None, user_id=None, start=0,
         urls.append('http://farm%s.staticflickr.com/%s/%s_%s.jpg' % (p.attrib['farm'], p.attrib['server'], p.attrib['id'], p.attrib['secret']))
         print(p.attrib['id'])
         ids.append(p.attrib['id'])
-        users.append(p.attrib['owner'])
+        if owner is None:
+            users.append(p.attrib['owner'])
+        else:
+            users.append(owner)
         if get_other_tags:
-            gs.append(p.attrib['tags'])
+            tgs.append(p.attrib['tags'])
         onames.append(p.attrib['ownername'])
     if get_other_tags:
         return tb.tabarray(columns = [urls, users, ids, tgs, onames], names=['url', 'user_id', 'id', 'tags', 'owner_name'])
