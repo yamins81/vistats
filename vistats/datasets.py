@@ -107,12 +107,14 @@ class FlickrTagUserDataset(object):
                    user_id=None,
                    limit=self.image_limit,
                    start=0, tag_mode='all', sort='relevance')
+            t1 = t1.addcols([[self.tags]*len(t1)], names=['source'])
             T.append(t1)
         for _t in self.text.split(','):
             t = flickr_utils.get_photo_data(text=_t,
                    user_id=None,
                    limit=self.image_limit,
                    start=0, tag_mode='all', sort='relevance')
+            t = t.addcols([[_t]*len(t)], names=['source'])
             T.append(t)
         return tb.tab_rowstack(T)
 
@@ -125,13 +127,14 @@ class FlickrTagUserDataset(object):
     
     def _get_tag_users(self):
         tag_images = self.tag_images
-        atags = tag_images[['user_id', 'url']].aggregate(On=['user_id'], AggFunc=len)
+        atags = tag_images[['user_id', 'url', 'source']].aggregate(On=['user_id'], AggFuncDict={'url': len, 'source': lambda x : x[0]})
         atags.sort(order=['url'])
         num_users = self.num_users
-        users = atags['user_id']
+        users = atags[['user_id', 'source']]
         if hasattr(self, 'bad_users'):
-            users = filter(lambda x: x not in self.bad_users, users)
-        users = np.array(users[-num_users:])
+            good_inds = np.array([_i for _i in range(len(users)) if users[_i]['user_id'] not in self.bad_users])
+            users = users[good_inds]
+        users = users[-num_users:]
         return users
     
     @property
@@ -147,19 +150,19 @@ class FlickrTagUserDataset(object):
         flickr = self.flickr
         for u in users:
             d1 = flickr_utils.get_photo_data(tags=None, text=None,
-                   user_id=u,
+                   user_id=u['user_id'],
                    limit=self.user_limit,
                    start=0, tag_mode='all', sort='relevance')
             d2 = flickr_utils.get_photo_data(tags=None, text=self.tag_in_text,
-                   user_id=u,
+                   user_id=u['user_id'],
                    limit=self.user_limit,
                    start=0, tag_mode='all', sort='relevance')
    
-            usets = json.loads(flickr.photosets_getList(user_id=u, format='json'))['photosets']['photoset']
+            usets = json.loads(flickr.photosets_getList(user_id=u['user_id'], format='json'))['photosets']['photoset']
             titles = [_s['title']['_content'] for _s in usets]
             usetids = [_s['id'] for _s in usets]
             descriptions =  [_s['description']['_content'] for _s in usets]
-            relevant = [_i for _i in range(len(usets)) if (self.tag_in_text in descriptions[_i]  or self.tag_in_text in titles[_i])]
+            relevant = [_i for _i in range(len(usets)) if (self.tag_in_text in descriptions[_i].lower()  or self.tag_in_text in titles[_i].lower())]
             if relevant:
                 d3s = []
                 for _i in relevant:
@@ -183,7 +186,7 @@ class FlickrTagUserDataset(object):
                     d = tb.tab_rowstack([d1, d2])
                 else:
                     d = d1
-
+            d = d.addcols([[u['source']]*len(d)], names=['source'])
             Ds.append(d)
             
         return tb.tab_rowstack(Ds)
@@ -205,13 +208,18 @@ class FlickrTagUserDataset(object):
             os.makedirs(metadir)
         if not os.path.isfile(metapath):
             tag_images = self.tag_images
+            users = self.tag_users
             m1 = self.tag_users_images
-            m1['Tag'] = m1['Tag'] | fast.isin(m1['id'], tag_images['id'])                                            
+            m1['Tag'] = m1['Tag'] | fast.isin(m1['id'], tag_images['id'])                                       
             m2 = tag_images[np.invert(fast.isin(tag_images['id'], m1['id']))]
+            #m2 = m2[fast.isin(m2['user_id'], users['user_id'])]
             m2 = m2.addcols([[1]*len(m2)], names=['Tag'])
             meta = tb.tab_rowstack([m1, m2])            
+            if hasattr(self, 'bad_users'):
+                good_inds = np.array([_i for _i in range(len(meta)) if meta[_i]['user_id'] not in self.bad_users])
+                meta = meta[good_inds]
             resource_home = self.home('resources')
-            filenames = [self.home('resources', ('Tag_' if t else 'NoTag_') + u.split('/')[-1]) for t, u in zip(meta['Tag'], meta['url'])]
+            filenames = [self.home('resources', ('Tag_' if t else 'NoTag_') + uid + '_' + u.split('/')[-1]) for t, u, uid in zip(meta['Tag'], meta['url'], meta['user_id'])]
             meta = meta.addcols([filenames], names=['filename'])
             meta = meta.aggregate(On=['url'], AggFunc=lambda x: x[0])
             meta.saveSV(metapath, metadata=True)
@@ -293,17 +301,6 @@ class FlickrTagUserDatasetCocaColaTest(FlickrTagUserDataset):
 ##########Chanel##########
 ##########################
 
-class FlickrTagUserDatasetChanelBagsTest(FlickrTagUserDataset):
-    tags=''
-    text = 'chanel flap bag,chanel tote, chanel handbags,chanel jumbo bag,chanel bag,chanel purse,chanel clutch,chanel coco cocoon bag,chanel mademoiselle bag,chanel lipstick bags,chanel key case'
-    num_users = 10
-    user_limit = 200
-    image_limit = 200
-    tag_in_text='chanel'
-    bad_users = ['74635508@N04', '61276641@N07']
-    add_tagtext_images = False
-   
-   
 class FlickrTagUserDatasetChanelMakeupTest(FlickrTagUserDataset):
     tags='chanel foundation,chanel hydramax'
     text = 'chanel sublimage,chanel hydramax,chanel nail polish,chanel le vernis,chanel lipstick,chanel levres scintillantes,chanel eyeshadow,chanel faoundation'
@@ -315,51 +312,98 @@ class FlickrTagUserDatasetChanelMakeupTest(FlickrTagUserDataset):
     add_tagtext_images = False
 
 
-class FlickrTagUserDatasetChanelFragranceTest(FlickrTagUserDataset):
+class FlickrTagUserDatasetChanelFragrance(FlickrTagUserDataset):
     tags=''
-    text = 'chanel No. 5, chanel No 5,coco chanel fragrance,coco chanel perfume,chanel coco mademoiselle,chanel chance perfume,chanel Chance Eau Fraiche,chanel Chance Eau Tendre,chanel allure purfume,chanel allure sensuelle,chanel allure homme,chanel allure homme,allure homme sport chanel,bleu de chanel'
-    num_users = 10
-    user_limit = 200
-    image_limit = 200
+    text = 'chanel "No. 5","chanel No 5","chanel fragrance","chanel perfume","chanel chance","chanel allure","bleu de chanel" fragrance'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 15000
+    tag_in_text='chanel'
+    bad_users = ['40795211@N00','43102195@N08','14605079@N04','23049244@N04','31300603@N06']
+    add_tagtext_images = False
+    
+    
+class FlickrTagUserDatasetChanelShoes(FlickrTagUserDataset):
+    tags=''
+    text = '"chanel shoe","chanel flat",chanel espadrille,"chanel clog","chanel heels","chanel pump","chanel high heel","chanel boot","chanel sandal",chanel "ballet flat","chanel loafer"'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 15000
+    tag_in_text='chanel'
+    bad_users = ['27826934@N05','32083515@N04','36619928@N08','28510667@N07','34401099@N06']
+    add_tagtext_images = False
+
+
+class FlickrTagUserDatasetChanelJewelry(FlickrTagUserDataset):
+    tags=''
+    text = '"chanel necklace","chanel earring","chanel camelia","chanel watch","chanel bracelet"'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 15000
     tag_in_text='chanel'
     bad_users = []
     add_tagtext_images = False
-    
-    
-class FlickrTagUserDatasetChanelShoesTest(FlickrTagUserDataset):
-    tags=''
-    text = 'chanel shoe,chanel flats,chanel espadrilles,chanel shoes'
-    num_users = 10
-    user_limit = 200
-    image_limit = 200
-    tag_in_text='chanel'
-    bad_users = []
-    add_tagtext_images = False
-    
 
-class FlickrTagUserDatasetChanelOverallTest(FlickrTagUserDataset):
+
+class FlickrTagUserDatasetChanelBag(FlickrTagUserDataset):
     tags=''
-    text = 'chanel logo,chanel flap bag,chanel tote,chanel handbags,chanel jumbo bag,chanel bag,chanel purse,chanel clutch,chanel coco cocoon bag,chanel mademoiselle bag,chanel lipstick bags,chanel key case,chanel No. 5,chanel No 5,coco chanel fragrance,coco chanel perfume,chanel chance,chanel allure,bleu de chanel,chanel shoes,chanel flats,chanel espadrilles,chanel pumps,chanel heels,chanel boots,chanel case'
-    num_users = 10
-    user_limit = 200
-    image_limit = 200
+    text = '"chanel logo","chanel flap","flap bag" chanel,"chanel tote","chanel handbag","chanel jumbo","chanel bag","chanel purse","chanel clutch","coco cocoon",chanel "key case","chanel wallet",chanel "cc logo"'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 15000
     tag_in_text='chanel'
-    ad_users = ['74635508@N04', '61276641@N07','67158843@N00', '57952699@N08']
+    bad_users = ['74635508@N04', '61276641@N07','67158843@N00', '57952699@N08','26814259@N04','88701127@N00','43102195@N08','39366895@N02','26814259@N04','40149686@N03','39681628@N02', '93762672@N02','47063161@N08', '10192717@N03', '16446436@N00','20383131@N00', '38462806@N04', '30911898@N04','40745917@N02', '42293676@N08','63917432@N07']
     add_tagtext_images = False
 
 
-class FlickrTagUserDatasetChanelOverall(FlickrTagUserDatasetChanelOverallTest):
-    num_users = 30
-    user_limit = 2000
-    image_limit = 4000
+class FlickrTagUserDatasetChanelOverall(FlickrTagUserDataset):
+    tags = ''
+    text = ','.join([FlickrTagUserDatasetChanelBag.text, 
+                     FlickrTagUserDatasetChanelFragrance.text,
+                     FlickrTagUserDatasetChanelJewelry.text,
+                     FlickrTagUserDatasetChanelShoes.text])
+    num_users = 50
+    user_limit = 1000
+    image_limit = 15000
+    tag_in_text = 'chanel'
+    bad_users = FlickrTagUserDatasetChanelBag.bad_users + \
+                FlickrTagUserDatasetChanelFragrance.bad_users + \
+                FlickrTagUserDatasetChanelJewelry.bad_users + \
+                FlickrTagUserDatasetChanelShoes.bad_users + ['38386646@N07','38462806@N04', '60024371@N08','62912952@N07','75678112@N07']
+    add_tagtext_images = False
 
 
-class FlickrTagUserDatasetMcDonaldsOverallTest(FlickrTagUserDataset):
+class FlickrTagUserDatasetChanelPurseTest0(FlickrTagUserDataset):
     tags=''
-    text = "mcdonald's,mcdonald's burger,mcdonald's big mac,mcdonald's salad,mcdonald's fries,mcdonald's mcwrap,mcdonald's chicken nuggets,mcdonald's mcnuggets,mcdonald's chicken sandwich,mcdonalds egg mcmuffin,mcflurry,mcdonald's milkshake,mccafe,mcdonalds coffee,mcdonald's buildings,mcdonald's bags,mcdonald's trash,mcdonald's golden arches,mcdonald's garbage,mcdonald's container,mcdonald's box,mcdonald's wifi,ronald mcdonald"
-    num_users = 10
-    user_limit = 200
-    image_limit = 200
+    text = 'chanel purse'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 1500
+    tag_in_text='chanel'
+    bad_users = ['74635508@N04', '61276641@N07','67158843@N00', '57952699@N08','26814259@N04','88701127@N00','43102195@N08','39366895@N02','26814259@N04','40149686@N03','39681628@N02', '93762672@N02','47063161@N08', '10192717@N03', '16446436@N00','20383131@N00', '38462806@N04']
+    add_tagtext_images = False
+
+
+class FlickrTagUserDatasetChanelPurseTest1(FlickrTagUserDataset):
+    tags=''
+    text = '"chanel purse"'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 1500
+    tag_in_text='chanel'
+    bad_users = ['74635508@N04', '61276641@N07','67158843@N00', '57952699@N08','26814259@N04','88701127@N00','43102195@N08','39366895@N02','26814259@N04','40149686@N03','39681628@N02', '93762672@N02','47063161@N08', '10192717@N03', '16446436@N00','20383131@N00', '38462806@N04']
+    add_tagtext_images = False
+
+
+
+############mcdonalds
+
+class FlickrTagUserDatasetMcDonaldsOverall(FlickrTagUserDataset):
+    tags=''
+    text = 'mcdonalds,"big mac",mcdonalds salad,mcdonalds fries,mcdonalds mcwrap,mcdonalds "chicken nuggets",mcdonalds mcnuggets,"egg mcmuffin",mcflurry,"mcdonalds milkshake",mccafe,mcdonalds coffee,"mcdonalds storefront","mcdonalds bags",mcdonalds trash,mcdonalds "golden arches",mcdonalds garbage,mcdonalds wifi,"ronald mcdonald",mcdonalds "ice cream",mcdonalds china,mcdonalds japan,mcdonalds paris,"mcdonalds breakfast","mcdonalds logo"'
+    num_users = 50
+    user_limit = 1000
+    image_limit = 10000
     tag_in_text="mcdonald"
     bad_users = []
     add_tagtext_images = False
