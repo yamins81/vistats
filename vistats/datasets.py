@@ -396,6 +396,14 @@ class FlickrTagUserDatasetChanelPurseTest1(FlickrTagUserDataset):
 
 
 
+
+
+import devthor.new_new_bandits as nnb
+def extract_on_vistats_chanel_dataset(ind, host0, host1, port0, port1, dbname0, dbname1, idfile, k=1):  
+    dataset = FlickrTagUserDatasetChanelOverall()
+    nnb.dset_extract_base(ind, host0, host1, port0, port1, dbname0, dbname1, idfile, dataset, k=k)
+
+
 ############mcdonalds
 
 class FlickrTagUserDatasetMcDonaldsOverall(FlickrTagUserDataset):
