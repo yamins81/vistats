@@ -256,10 +256,23 @@ class FlickrTagUserDataset(object):
             if not os.path.isdir(dirname):
                 os.makedirs(dirname)
             if not os.path.isfile(lpath):
-                with open(lpath, 'w') as _f:
-                    fp = urllib2.urlopen(url)
-                    print(url, lpath)
-                    _f.write(fp.read())
+                a = 0
+                attempts = 10
+                while True:
+                    try:
+                        with open(lpath, 'w') as _f:
+                            fp = urllib2.urlopen(url)
+                            print(url, lpath)
+                            _f.write(fp.read())
+                    except:
+                        a += 1
+                        print('attempt', a)
+                    else:
+                        break
+                    if a >= attempts:
+                        break
+                    
+                
         
         
 #########################
