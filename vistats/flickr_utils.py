@@ -29,7 +29,7 @@ def get_photos(limit=100, tags=None, text=None, user_id=None, start=0):
 
         
 def get_photo_data(**kwargs):
-    attempts = 10
+    attempts = 50
     wait_time = 60
     a = 0
     while a < attempts:
@@ -37,6 +37,7 @@ def get_photo_data(**kwargs):
             data = get_photo_data_core(**kwargs)
         except flickrapi.FlickrError:
             time.sleep(wait_time)
+            print('attempt', a)
             a += 1
         else:
             break
