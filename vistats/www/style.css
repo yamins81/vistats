@@ -89,15 +89,27 @@ h7 a {
 /* ------------------------------
  Layout
 ------------------------------ */
-#container {
-    margin: 0 auto;
+#container{
+    margin: auto;
     text-align: left;
     width: 1000px;
+    background-color: #EFEFEF;
+    padding: 15px;
+}
+
+#innercontainer {
+    margin: 35px 35px 35px 35px; 
+    position: relative;
+    background-color: #FF8C69;
 }
 
 #inner {
-    margin: 0 20px;
+    margin: 100px;
     position: relative;
+    border:10px;
+    border-color:#ffffff;
+    border-transparent: false;
+    /* padding: 0px 5px 0px 5px; */
 }
 
 #header {
@@ -105,14 +117,24 @@ h7 a {
     margin: 50px 0 0 0;
 }
 
+#header p{
+    padding: 0px 0px 0px 0px;
+}
+
 #main {
-    float: left;
-    width: 700px;
+    position: relative;
+    width: 790px;
+    /*margin-left: 50px; */
+    /*background-color:#000000; */
+    /*border: 10px;*/
 }
 
 #main .entry {
     position: relative;
-    width: 700px;
+    /*width: 700px; */
+    padding: 8px 8px 8px 8px;
+    /*color:#ffffff;*/
+    background-color: #ffffff; /*#bb8C67; */
 }
 
 #side {
@@ -272,8 +294,13 @@ h7 a {
 
 }
 
+#main .entryheader{
+    background-color: #000000;
+    color: #ffffff;
+}
+
 #main h2.entrytitle {
-    padding: 0;
+    padding: 3;
     margin: 0;
     text-transform:uppercase;
 }
@@ -318,7 +345,7 @@ h7 a {
 }
 
 #main p {
-    color: #202020;
+    /* color: #202020; */
     font-size: 14px;
     line-height: 150%;
     margin: 0 0 1em 0;
@@ -326,12 +353,12 @@ h7 a {
 }
 
 #main .date {
-    color: #202020;
+    /* color: #202020; */
     font-size: 15px;
     margin: 6px 0 45px 0;
     font-style: italic;
     border-top: 1px dotted #CCC;
-    padding-top: 5px;
+    padding: 5px;
     line-height: 150%;
 }
 
@@ -910,8 +937,10 @@ div.aligncenter {
 
 .show_img {
     float: left;
+    padding: 5px;
 }
 
 .show_img img{
    width: 200px;
 }
+

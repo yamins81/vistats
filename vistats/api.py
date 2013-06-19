@@ -34,6 +34,7 @@ HTML_TEMPLATE = """
 <html>
 <head>
 <title>Vistats Chanel Blog!</title>
+<link rel="shortcut icon" href="/static/favicon.ico" />
 <link href='http://fonts.googleapis.com/css?family=Arimo:400,700' rel='stylesheet' type='text/css'>
 <script type="text/javascript">
   WebFontConfig = {
@@ -61,13 +62,16 @@ HTML_TEMPLATE = """
 </head>
 <body>
 <div id="container">
+<div id="innercontainer">
 <div id="inner">
 <div id="header">
-<a href="/vistats_blog"><img src="/static/logo.png"></a>
-Hi! Welcome to Vistats Chanel- and non-Chanel blog.   Here I'll be showing some of my favorite chanel related (and other images).
+<a href="/vistats_blog"><img width="800px" src="/static/chanel_blog_logo.png"></a><br/>
+<p>
+Hi! Welcome to Vistats Chanel- and non-Chanel blog.   Here I'll be showing some of my favorite chanel related (and other images).</p><br/><br/>
 </div>
 <div id="main">
 %s
+</div>
 </div>
 </div>
 </div>
@@ -82,8 +86,8 @@ class BlogHandler(tornado.web.RequestHandler):
     def get(self):
         meta = tb.tabarray(SVfile=os.path.join(RESULTS_ROOT, 'meta_with_margin_test.tsv'))
         
-        N = 2
-        days = 6
+        N = 3
+        days = 4
         text = ''
         NP = 200
         NN = 200
@@ -93,14 +97,14 @@ class BlogHandler(tornado.web.RequestHandler):
         mdn = mdn[np.random.RandomState(None).permutation(NN)]['filename']
 
         for d in range(days):
-            text += '<div class="entry" id="day_header_%d"><h2 class="entrytitle">Day %d</h2>' % (d, d)
-            text += '<div class="date">posted by <a href="/vistats_blog">Vistats</a> on 2013.06.19</div>'
+            text += '<div class="entry" id="day_header_%d"><div class="entryheader"><h2 class="entrytitle">Day %d</h2>' % (d, d+1)
+            text += '<div class="date">posted by <a href="/vistats_blog">Vistats</a> on 2013.06.19</div></div>'
             ctext = "So, here are my Chanel pics of the day :)"
             text += '<p class="chanel_header" id="chanel_header_day_%d">%s</p><br/>' % (d, ctext)
             chaneltext = '<div class="img_div" id="chanel_img_div_day_%d">' % d + ''.join(['<div class="show_img" id="chanel_img_day_%d_img_%d"><img src="%s/%s"></div>' % (d, _i, IMG_ROOT,x.split('/')[-1]) for _i, x in enumerate(mdp[d*N:(d+1)*N])]) + '</div>'
             text += chaneltext
             notchaneltext = '<div class="img_div" id="not_chanel_img_div_day_%d">' % d + ''.join(['<div class="show_img" id="not_chanel_img_day_%d_img_%d"><img src="%s/%s"></div>' % (d, _i, IMG_ROOT, x.split('/')[-1]) for _i, x in enumerate(mdn[d*N:(d+1)*N])]) + '</div>'
-            nctext = "Hey, and of course I also have a life <b>outside</b> of Chanel :)"
+            nctext = "<br/>Hey, and of course I also have a life <b>outside</b> of Chanel :)"
             text += '<p class="not_chanel_header" id="not_chanel_header_day_%d">%s</p><br/>' % (d, nctext) + notchaneltext
             text += '</div>'
 
